@@ -1,10 +1,10 @@
 import { sdk } from "@farcaster/frame-sdk";
 import { useEffect, useState } from "react";
 import { useAccount, useConnect, useWalletClient } from "wagmi";
-// import Safe from "@safe-global/protocol-kit";
-// import { getConnectorClient } from "@wagmi/core";
-
-// import { fetchUserSafes } from "./safeService";
+import Safe from "@safe-global/protocol-kit";
+import { getConnectorClient } from "@wagmi/core";
+import { config } from "./wagmi";
+import { fetchUserSafes } from "./safeService";
 
 function App() {
   useEffect(() => {
@@ -22,37 +22,52 @@ function App() {
 function ConnectMenu() {
   const { isConnected, address } = useAccount();
   const { connect, connectors } = useConnect();
-  // const [safes, setSafes] = useState<string[]>([]);
-  // const [selectedSafe, setSelectedSafe] = useState<string | null>(null);
-  // const [loadingSafes, setLoadingSafes] = useState(false);
-  // const [error, setError] = useState<string | null>(null);
+  const [safes, setSafes] = useState<string[]>([]);
+  const [selectedSafe, setSelectedSafe] = useState<string | null>(null);
+  const [loadingSafes, setLoadingSafes] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // useEffect(() => {
-  //   if (isConnected && address) {
-  //     setLoadingSafes(true);
-  //     setError(null);
-  //     fetchUserSafes(address)
-  //       .then((safesData) => {
-  //         setSafes(safesData);
-  //         if (safesData.length === 0) {
-  //           setError("No Safe accounts found for this address");
-  //         }
-  //       })
-  //       .catch((err) => {
-  //         setError(err.message);
-  //       })
-  //       .finally(() => {
-  //         setLoadingSafes(false);
-  //       });
-  //   }
-  // }, [isConnected, address]);
+  useEffect(() => {
+    if (isConnected && address) {
+      setLoadingSafes(true);
+      setError(null);
+      fetchUserSafes(address)
+        .then((safesData) => {
+          setSafes(safesData);
+          if (safesData.length === 0) {
+            setError("No Safe accounts found for this address");
+          }
+        })
+        .catch((err) => {
+          setError(err.message);
+        })
+        .finally(() => {
+          setLoadingSafes(false);
+        });
+    }
+  }, [isConnected, address]);
 
   if (isConnected) {
     return (
       <>
         <div>Connected account:</div>
         <div>{address}</div>
-        <SignButton />
+        {loadingSafes && <div>Loading Safe accounts...</div>}
+        {error && <div style={{ color: "red" }}>{error}</div>}
+        {safes.length > 0 && (
+          <>
+            <div>Select a Safe:</div>
+            <select onChange={(e) => setSelectedSafe(e.target.value)} value={selectedSafe || ""}>
+              <option value="">-- Select Safe --</option>
+              {safes.map((safe) => (
+                <option key={safe} value={safe}>
+                  {safe}
+                </option>
+              ))}
+            </select>
+          </>
+        )}
+        {selectedSafe && <SignButton safeAddress={selectedSafe} />}
       </>
     );
   }
@@ -64,7 +79,7 @@ function ConnectMenu() {
   );
 }
 
-function SignButton() {
+function SignButton({ safeAddress }: { safeAddress: string }) {
   const { data: walletClient } = useWalletClient();
   const [signing, setSigning] = useState(false);
   const [signature, setSignature] = useState<string | null>(null);
@@ -81,6 +96,14 @@ function SignButton() {
     setSignature(null);
 
     try {
+      // Initialize Safe Protocol Kit
+      const client = await getConnectorClient(config);
+      const protocolKit = await Safe.init({
+        provider: client.transport.url || "https://rpc.gnosis.gateway.fm",
+        signer: walletClient.account.address,
+        safeAddress,
+      });
+
       // EIP-712 typed data
       const domain = {
         name: "My App",
@@ -101,16 +124,18 @@ function SignButton() {
         timestamp: BigInt(Math.floor(Date.now() / 1000)),
       };
 
-      // Sign typed data v4
-      const signature = await walletClient.signTypedData({
-        account: walletClient.account,
+      // Create Safe message using createMessage
+      const safeMessage = protocolKit.createMessage({
         domain,
         types,
         primaryType: "Message",
         message,
       });
 
-      setSignature(signature);
+      // Sign with Safe
+      const safeSignature = await protocolKit.signMessage(safeMessage);
+
+      setSignature(JSON.stringify(safeSignature.data, null, 2));
     } catch (err: any) {
       setError(err.message || "Failed to sign message");
     } finally {
