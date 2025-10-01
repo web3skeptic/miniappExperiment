@@ -2,6 +2,7 @@ import { sdk } from "@farcaster/frame-sdk";
 import { useEffect, useState } from "react";
 import { useAccount, useConnect, useWalletClient } from "wagmi";
 import Safe from "@safe-global/protocol-kit";
+
 import { fetchUserSafes } from "./safeService";
 
 function App() {
@@ -104,8 +105,9 @@ function SignButton({ safeAddress }: { safeAddress: string }) {
         signer: walletClient.account.address,
         safeAddress,
       });
+      const message = protocolKit.createMessage("hello world")
 
-      const signedMessage = await protocolKit.signMessage({ message: "hello world" });
+      const signedMessage = await protocolKit.signMessage(message);
       setSignature(JSON.stringify(signedMessage, null, 2));
     } catch (err: any) {
       setError(err.message || "Failed to sign message");

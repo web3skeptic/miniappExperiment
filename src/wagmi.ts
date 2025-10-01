@@ -1,6 +1,6 @@
 import { farcasterFrame } from "@farcaster/frame-wagmi-connector";
 import { http, createConfig } from "wagmi";
-import { base, gnosis, mainnet } from "wagmi/chains";
+import { gnosis } from "wagmi/chains";
 
 export const config = createConfig({
   chains: [gnosis],

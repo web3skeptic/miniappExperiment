@@ -8,4 +8,18 @@ export default defineConfig({
   server: {
     allowedHosts: true,
   },
+  define: {
+    global: "globalThis",
+  },
+  resolve: {
+    alias: {
+      crypto: "crypto-browserify",
+      stream: "stream-browserify",
+      assert: "assert",
+      http: "stream-http",
+      https: "https-browserify",
+      os: "os-browserify",
+      url: "url",
+    },
+  },
 });
