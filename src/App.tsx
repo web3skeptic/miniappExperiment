@@ -133,7 +133,7 @@ function SignButton({ safeAddress }: { safeAddress: string }) {
 
       // Display the signature
       setSignature(JSON.stringify({
-        messageHash: safeMessage.messageHash,
+        messageHash: safeMessage.toString(),
         signature: safeSignature.data,
         encodedSignatures: safeSignature.encodedSignatures(),
       }, null, 2));
