@@ -1,10 +1,10 @@
 import { sdk } from "@farcaster/frame-sdk";
 import { useEffect, useState } from "react";
-import { useAccount, useConnect, useWalletClient, useConfig } from "wagmi";
-import Safe from "@safe-global/protocol-kit";
-import { getConnectorClient } from "@wagmi/core";
+import { useAccount, useConnect, useWalletClient } from "wagmi";
+// import Safe from "@safe-global/protocol-kit";
+// import { getConnectorClient } from "@wagmi/core";
 
-import { fetchUserSafes } from "./safeService";
+// import { fetchUserSafes } from "./safeService";
 
 function App() {
   useEffect(() => {
@@ -22,57 +22,37 @@ function App() {
 function ConnectMenu() {
   const { isConnected, address } = useAccount();
   const { connect, connectors } = useConnect();
-  const [safes, setSafes] = useState<string[]>([]);
-  const [selectedSafe, setSelectedSafe] = useState<string | null>(null);
-  const [loadingSafes, setLoadingSafes] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // const [safes, setSafes] = useState<string[]>([]);
+  // const [selectedSafe, setSelectedSafe] = useState<string | null>(null);
+  // const [loadingSafes, setLoadingSafes] = useState(false);
+  // const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (isConnected && address) {
-      setLoadingSafes(true);
-      setError(null);
-      fetchUserSafes(address)
-        .then((safesData) => {
-          setSafes(safesData);
-          if (safesData.length === 0) {
-            setError("No Safe accounts found for this address");
-          }
-        })
-        .catch((err) => {
-          setError(err.message);
-        })
-        .finally(() => {
-          setLoadingSafes(false);
-        });
-    }
-  }, [isConnected, address]);
+  // useEffect(() => {
+  //   if (isConnected && address) {
+  //     setLoadingSafes(true);
+  //     setError(null);
+  //     fetchUserSafes(address)
+  //       .then((safesData) => {
+  //         setSafes(safesData);
+  //         if (safesData.length === 0) {
+  //           setError("No Safe accounts found for this address");
+  //         }
+  //       })
+  //       .catch((err) => {
+  //         setError(err.message);
+  //       })
+  //       .finally(() => {
+  //         setLoadingSafes(false);
+  //       });
+  //   }
+  // }, [isConnected, address]);
 
   if (isConnected) {
-    if (selectedSafe) {
-      return <SignButton safeAddress={selectedSafe} />;
-    }
-
     return (
       <>
-        <div>Connected EOA:</div>
+        <div>Connected account:</div>
         <div>{address}</div>
-        {loadingSafes && <div>Loading Safe accounts...</div>}
-        {error && <div style={{ color: "red" }}>{error}</div>}
-        {safes.length > 0 && (
-          <>
-            <div>Select a Safe account:</div>
-            {safes.map((safe) => (
-              <button
-                key={safe}
-                type="button"
-                onClick={() => setSelectedSafe(safe)}
-                style={{ display: "block", margin: "5px 0" }}
-              >
-                {safe}
-              </button>
-            ))}
-          </>
-        )}
+        <SignButton />
       </>
     );
   }
@@ -84,9 +64,8 @@ function ConnectMenu() {
   );
 }
 
-function SignButton({ safeAddress }: { safeAddress: string }) {
+function SignButton() {
   const { data: walletClient } = useWalletClient();
-  const config = useConfig();
   const [signing, setSigning] = useState(false);
   const [signature, setSignature] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -102,23 +81,36 @@ function SignButton({ safeAddress }: { safeAddress: string }) {
     setSignature(null);
 
     try {
-      // Get the connector client from wagmi
-      const client = await getConnectorClient(config);
+      // EIP-712 typed data
+      const domain = {
+        name: "My App",
+        version: "1",
+        chainId: 100, // Gnosis Chain
+        verifyingContract: "0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC" as `0x${string}`,
+      };
 
-      // Initialize Safe with wagmi provider and signer
-      const protocolKit = await Safe.init({
-        provider: client.transport,
-        signer: client.account.address,
-        safeAddress,
+      const types = {
+        Message: [
+          { name: "content", type: "string" },
+          { name: "timestamp", type: "uint256" },
+        ],
+      };
+
+      const message = {
+        content: "hello world",
+        timestamp: BigInt(Math.floor(Date.now() / 1000)),
+      };
+
+      // Sign typed data v4
+      const signature = await walletClient.signTypedData({
+        account: walletClient.account,
+        domain,
+        types,
+        primaryType: "Message",
+        message,
       });
 
-      const messageText = "hello world";
-      const message = protocolKit.createMessage(messageText);
-
-      // Sign the message using Safe protocol kit
-      const signedMessage = await protocolKit.signMessage(message);
-
-      setSignature(JSON.stringify(signedMessage, null, 2));
+      setSignature(signature);
     } catch (err: any) {
       setError(err.message || "Failed to sign message");
     } finally {
@@ -128,9 +120,8 @@ function SignButton({ safeAddress }: { safeAddress: string }) {
 
   return (
     <>
-      <div>Safe Account: {safeAddress}</div>
       <button type="button" onClick={handleSign} disabled={signing}>
-        {signing ? "Signing..." : "Sign 'hello world' message"}
+        {signing ? "Signing..." : "Sign typed data v4"}
       </button>
       {signature && (
         <>
