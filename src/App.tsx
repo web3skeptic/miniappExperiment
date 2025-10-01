@@ -1,7 +1,8 @@
 import { sdk } from "@farcaster/frame-sdk";
 import { useEffect, useState } from "react";
-import { useAccount, useConnect, useWalletClient } from "wagmi";
+import { useAccount, useConnect, useWalletClient, useConfig } from "wagmi";
 import Safe from "@safe-global/protocol-kit";
+import { getConnectorClient } from "@wagmi/core";
 
 import { fetchUserSafes } from "./safeService";
 
@@ -85,6 +86,7 @@ function ConnectMenu() {
 
 function SignButton({ safeAddress }: { safeAddress: string }) {
   const { data: walletClient } = useWalletClient();
+  const config = useConfig();
   const [signing, setSigning] = useState(false);
   const [signature, setSignature] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -100,14 +102,22 @@ function SignButton({ safeAddress }: { safeAddress: string }) {
     setSignature(null);
 
     try {
+      // Get the connector client from wagmi
+      const client = await getConnectorClient(config);
+
+      // Initialize Safe with wagmi provider and signer
       const protocolKit = await Safe.init({
-        provider: walletClient.transport.url || "https://rpc.gnosischain.com",
-        signer: walletClient.account.address,
+        provider: client.transport,
+        signer: client.account.address,
         safeAddress,
       });
-      const message = protocolKit.createMessage("hello world")
 
+      const messageText = "hello world";
+      const message = protocolKit.createMessage(messageText);
+
+      // Sign the message using Safe protocol kit
       const signedMessage = await protocolKit.signMessage(message);
+
       setSignature(JSON.stringify(signedMessage, null, 2));
     } catch (err: any) {
       setError(err.message || "Failed to sign message");
