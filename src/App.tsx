@@ -99,44 +99,46 @@ function SignButton({ safeAddress }: { safeAddress: string }) {
       // Initialize Safe Protocol Kit
       const client = await getConnectorClient(config);
       const protocolKit = await Safe.init({
-        provider: client.transport.url || "https://rpc.gnosis.gateway.fm",
+        provider: client.chain.rpcUrls.default.http[0],
         signer: walletClient.account.address,
         safeAddress,
       });
 
       // EIP-712 typed data
-      const domain = {
-        name: "My App",
-        version: "1",
-        chainId: 100, // Gnosis Chain
-        verifyingContract: "0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC" as `0x${string}`,
-      };
-
-      const types = {
-        Message: [
-          { name: "content", type: "string" },
-          { name: "timestamp", type: "uint256" },
-        ],
-      };
-
-      const message = {
-        content: "hello world",
-        timestamp: BigInt(Math.floor(Date.now() / 1000)),
+      const typedData = {
+        domain: {
+          name: "My App",
+          version: "1",
+          chainId: 100, // Gnosis Chain
+          verifyingContract: "0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC" as `0x${string}`,
+        },
+        types: {
+          Message: [
+            { name: "content", type: "string" },
+            { name: "timestamp", type: "uint256" },
+          ],
+        },
+        primaryType: "Message",
+        message: {
+          content: "hello world",
+          timestamp: BigInt(Math.floor(Date.now() / 1000)),
+        },
       };
 
       // Create Safe message using createMessage
-      const safeMessage = protocolKit.createMessage({
-        domain,
-        types,
-        primaryType: "Message",
-        message,
-      });
+      const safeMessage = protocolKit.createMessage(typedData);
 
       // Sign with Safe
       const safeSignature = await protocolKit.signMessage(safeMessage);
 
-      setSignature(JSON.stringify(safeSignature.data, null, 2));
+      // Display the signature
+      setSignature(JSON.stringify({
+        messageHash: safeMessage.messageHash,
+        signature: safeSignature.data,
+        encodedSignatures: safeSignature.encodedSignatures(),
+      }, null, 2));
     } catch (err: any) {
+      console.error("Sign error:", err);
       setError(err.message || "Failed to sign message");
     } finally {
       setSigning(false);
